@@ -1,65 +1,53 @@
 import Foundation
 
+// Custom Error to handle API failures cleanly
+enum NetworkError: Error {
+    case invalidURL
+    case invalidResponse
+    case serverError
+}
+
 class NetworkManager {
     static let shared = NetworkManager()
 
-    let baseURL = "http://127.0.0.1:5000"
+    let baseURL = "http://34.86.208.250"
 
     // MARK: - Create User
-    func createUser(name: String?, completion: @escaping (User?) -> Void) {
-        guard let url = URL(string: "\(baseURL)/api/users") else {
-            completion(nil)
-            return
-        }
+    func createUser(name: String?) async throws -> User {
+        guard let url = URL(string: "\(baseURL)/api/users") else { throw NetworkError.invalidURL }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let body: [String: Any] = ["name": name ?? ""]
-        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            DispatchQueue.main.async {
-                guard let data = data, error == nil else {
-                    print("Error creating user: \(error?.localizedDescription ?? "Unknown")")
-                    completion(nil)
-                    return
-                }
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
+            throw NetworkError.serverError
+        }
 
-                let user = try? JSONDecoder().decode(User.self, from: data)
-                completion(user)
-            }
-        }.resume()
+        return try JSONDecoder().decode(User.self, from: data)
     }
 
     // MARK: - Get User
-    func getUser(userId: Int, completion: @escaping (User?) -> Void) {
-        guard let url = URL(string: "\(baseURL)/api/users/\(userId)") else {
-            completion(nil)
-            return
+    func getUser(userId: Int) async throws -> User {
+        guard let url = URL(string: "\(baseURL)/api/users/\(userId)") else { throw NetworkError.invalidURL }
+
+        let (data, response) = try await URLSession.shared.data(from: url)
+        
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw NetworkError.serverError
         }
 
-        URLSession.shared.dataTask(with: url) { data, response, error in
-            DispatchQueue.main.async {
-                guard let data = data, error == nil else {
-                    print("Error fetching user: \(error?.localizedDescription ?? "Unknown")")
-                    completion(nil)
-                    return
-                }
-
-                let user = try? JSONDecoder().decode(User.self, from: data)
-                completion(user)
-            }
-        }.resume()
+        return try JSONDecoder().decode(User.self, from: data)
     }
 
     // MARK: - Create Global Habit
-    func createGlobalHabit(title: String, description: String?, completion: @escaping (Habit?) -> Void) {
-        guard let url = URL(string: "\(baseURL)/api/habits") else {
-            completion(nil)
-            return
-        }
+    func createHabit(title: String, description: String?) async throws -> Habit {
+        guard let url = URL(string: "\(baseURL)/api/habits") else { throw NetworkError.invalidURL }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -69,125 +57,84 @@ class NetworkManager {
         if let description = description {
             body["description"] = description
         }
-        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            DispatchQueue.main.async {
-                guard let data = data, error == nil else {
-                    print("Error creating habit: \(error?.localizedDescription ?? "Unknown")")
-                    completion(nil)
-                    return
-                }
-
-                let habit = try? JSONDecoder().decode(Habit.self, from: data)
-                completion(habit)
-            }
-        }.resume()
-    }
-
-    // MARK: - List Global Habits
-    func listGlobalHabits(completion: @escaping ([Habit]?) -> Void) {
-        guard let url = URL(string: "\(baseURL)/api/habits") else {
-            completion(nil)
-            return
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
+            throw NetworkError.serverError
         }
 
-        URLSession.shared.dataTask(with: url) { data, response, error in
-            DispatchQueue.main.async {
-                guard let data = data, error == nil else {
-                    print("Error fetching habits: \(error?.localizedDescription ?? "Unknown")")
-                    completion(nil)
-                    return
-                }
-
-                let habits = try? JSONDecoder().decode([Habit].self, from: data)
-                completion(habits)
-            }
-        }.resume()
+        return try JSONDecoder().decode(Habit.self, from: data)
     }
 
     // MARK: - Get User Habits
-    func getUserHabits(userId: Int, completion: @escaping ([Habit]?) -> Void) {
-        guard let url = URL(string: "\(baseURL)/api/users/\(userId)/habits") else {
-            completion(nil)
-            return
+    func getUserHabits(userId: Int) async throws -> [Habit] {
+        guard let url = URL(string: "\(baseURL)/api/users/\(userId)/habits") else { throw NetworkError.invalidURL }
+
+        let (data, response) = try await URLSession.shared.data(from: url)
+        
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw NetworkError.serverError
         }
 
-        URLSession.shared.dataTask(with: url) { data, response, error in
-            DispatchQueue.main.async {
-                guard let data = data, error == nil else {
-                    print("Error fetching user habits: \(error?.localizedDescription ?? "Unknown")")
-                    completion(nil)
-                    return
-                }
-
-                let habits = try? JSONDecoder().decode([Habit].self, from: data)
-                completion(habits)
-            }
-        }.resume()
+        return try JSONDecoder().decode([Habit].self, from: data)
     }
 
-    // MARK: - Get Daily Habits
-    func getDailyHabits(userId: Int, date: String, completion: @escaping ([DailyHabit]?) -> Void) {
-        guard let url = URL(string: "\(baseURL)/api/users/\(userId)/habits/daily?date=\(date)") else {
-            completion(nil)
-            return
+    // MARK: - Get Daily Completions
+    func getDailyCompletions(userId: Int, date: String) async throws -> [DailyHabit] {
+        guard let url = URL(string: "\(baseURL)/api/users/\(userId)/habits/daily?date=\(date)") else { throw NetworkError.invalidURL }
+
+        let (data, response) = try await URLSession.shared.data(from: url)
+        
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw NetworkError.serverError
         }
 
-        URLSession.shared.dataTask(with: url) { data, response, error in
-            DispatchQueue.main.async {
-                guard let data = data, error == nil else {
-                    print("Error fetching daily habits: \(error?.localizedDescription ?? "Unknown")")
-                    completion(nil)
-                    return
-                }
-
-                let dailyHabits = try? JSONDecoder().decode([DailyHabit].self, from: data)
-                completion(dailyHabits)
-            }
-        }.resume()
+        return try JSONDecoder().decode([DailyHabit].self, from: data)
     }
 
     // MARK: - Mark Habit Complete
-    func markHabitComplete(userId: Int, habitId: Int, date: String, completion: @escaping (Bool) -> Void) {
-        guard let url = URL(string: "\(baseURL)/api/users/\(userId)/habits/\(habitId)/complete?date=\(date)") else {
-            completion(false)
-            return
-        }
+    func markComplete(userId: Int, habitId: Int, date: String) async throws -> Bool {
+        guard let url = URL(string: "\(baseURL)/api/users/\(userId)/habits/\(habitId)/complete?date=\(date)") else { throw NetworkError.invalidURL }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
 
-        URLSession.shared.dataTask(with: request) { _, response, error in
-            DispatchQueue.main.async {
-                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 || httpResponse.statusCode == 201 {
-                    completion(true)
-                } else {
-                    completion(false)
-                }
-            }
-        }.resume()
+        let (_, response) = try await URLSession.shared.data(for: request)
+        
+        if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 || httpResponse.statusCode == 201 {
+            return true
+        }
+        return false
     }
 
     // MARK: - Unmark Habit Complete
-    func unmarkHabitComplete(userId: Int, habitId: Int, date: String, completion: @escaping (Bool) -> Void) {
-        guard let url = URL(string: "\(baseURL)/api/users/\(userId)/habits/\(habitId)/complete?date=\(date)") else {
-            completion(false)
-            return
-        }
+    func unmarkComplete(userId: Int, habitId: Int, date: String) async throws -> Bool {
+        guard let url = URL(string: "\(baseURL)/api/users/\(userId)/habits/\(habitId)/complete?date=\(date)") else { throw NetworkError.invalidURL }
 
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
 
-        URLSession.shared.dataTask(with: request) { _, response, error in
-            DispatchQueue.main.async {
-                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
-                    completion(true)
-                } else {
-                    completion(false)
-                }
-            }
-        }.resume()
+        let (_, response) = try await URLSession.shared.data(for: request)
+        
+        if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+            return true
+        }
+        return false
     }
 
+    // MARK: - Get Habit Streak
+    // Renamed to match ViewModel call: getStreak
+    func getStreak(userId: Int, habitId: Int) async throws -> HabitStreak {
+        guard let url = URL(string: "\(baseURL)/api/users/\(userId)/habits/\(habitId)/streak") else { throw NetworkError.invalidURL }
+
+        let (data, response) = try await URLSession.shared.data(from: url)
+        
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw NetworkError.serverError
+        }
+
+        return try JSONDecoder().decode(HabitStreak.self, from: data)
+    }
 }

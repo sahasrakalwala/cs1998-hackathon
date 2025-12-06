@@ -13,25 +13,17 @@ struct Habit: Codable, Identifiable {
     let description: String?
 }
 
-// UserHabit join table representation
-struct UserHabit: Codable, Identifiable {
-    let id: Int
-    let user_id: Int
-    let habit_id: Int
-}
-
-// Daily habit completion model
-struct DailyHabitCompletion: Codable, Identifiable {
-    let id: Int
-    let user_id: Int
-    let habit_id: Int
-    let date: String // YYYY-MM-DD format
-}
-
 // Response model for daily habits endpoint
 struct DailyHabit: Codable, Identifiable {
     let id: Int
     let title: String
     let description: String?
     var completed: Bool
+}
+
+// Response model for habit streak
+struct HabitStreak: Codable {
+    let habit_id: Int
+    let current_streak: Int
+    let longest_streak: Int
 }
