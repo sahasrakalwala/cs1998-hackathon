@@ -1,6 +1,6 @@
 # cs1998-hackathon
 Habit Tracker
-App Tagline: A way to keep all your habits in check.
+App Tagline: Keep your habits in check.
 
 https://github.com/sachhayaKO/AppDev-Planner -> Backend Repo
 
